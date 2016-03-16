@@ -63,25 +63,6 @@
       <additionalClasspath></additionalClasspath>
     </javaposse.jobdsl.plugin.ExecuteDslScripts>
   </builders>
-  <publishers>
-    <hudson.plugins.s3.S3BucketPublisher plugin="s3@0.8">
-      <profileName>jenkins-backup</profileName>
-      <entries>
-        <hudson.plugins.s3.Entry>
-          <bucket>dbcc-jenkins-archive/tmp</bucket>
-          <sourceFile>**/../../../</sourceFile>
-          <storageClass>STANDARD</storageClass>
-          <selectedRegion>us-west-1</selectedRegion>
-          <noUploadOnFailure>false</noUploadOnFailure>
-          <uploadFromSlave>true</uploadFromSlave>
-          <managedArtifacts>true</managedArtifacts>
-          <useServerSideEncryption>true</useServerSideEncryption>
-          <flatten>false</flatten>
-        </hudson.plugins.s3.Entry>
-      </entries>
-      <dontWaitForConcurrentBuildCompletion>false</dontWaitForConcurrentBuildCompletion>
-      <userMetadata/>
-    </hudson.plugins.s3.S3BucketPublisher>
-  </publishers>
+  <publishers/>
   <buildWrappers/>
 </project>
