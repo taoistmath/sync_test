@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><project>
+    <actions/>
+    <description>RPM directory has to contain at least SPECS and SOURES directrory and optional prebuild.sh script</description>
+    <keepDependencies>false</keepDependencies>
+    <properties>
+        <hudson.security.AuthorizationMatrixProperty>
+            <blocksInheritance>false</blocksInheritance>
+            <permission>hudson.scm.SCM.Tag:Developers</permission>
+            <permission>hudson.model.Item.Read:Developers</permission>
+            <permission>hudson.model.Item.Workspace:Developers</permission>
+            <permission>hudson.model.Item.Discover:Developers</permission>
+            <permission>hudson.model.Item.Build:Developers</permission>
+            <permission>hudson.model.Item.Cancel:Developers</permission>
+            <permission>hudson.model.Run.Update:Developers</permission>
+            <permission>hudson.model.Run.Delete:Developers</permission>
+        </hudson.security.AuthorizationMatrixProperty>
+        <hudson.model.ParametersDefinitionProperty>
+            <parameterDefinitions>
+                <hudson.model.StringParameterDefinition>
+                    <name>RPM_SELECTED</name>
+                    <defaultValue>Name of the directory/rpm to build</defaultValue>
+                </hudson.model.StringParameterDefinition>
+            </parameterDefinitions>
+        </hudson.model.ParametersDefinitionProperty>
+        <com.coravy.hudson.plugins.github.GithubProjectProperty>
+            <projectUrl>https://github.com/dandb/site-config-specs/</projectUrl>
+        </com.coravy.hudson.plugins.github.GithubProjectProperty>
+    </properties>
+    <canRoam>false</canRoam>
+    <disabled>false</disabled>
+    <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+    <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+    <triggers class="vector"/>
+    <concurrentBuild>false</concurrentBuild>
+    <builders>
+        <hudson.tasks.Shell>
+            <command>#!/bin/bash
+
+for dir in BUILD RPMS SOURCES SPECS SRPMS
+do
+ [[ -d $dir ]] &amp;&amp; rm -Rf $dir
+ [[ -d ${RPM_SELECTED}/$dir ]] &amp;&amp; cp -R ${RPM_SELECTED}/$dir $dir || mkdir $dir
+done
+
+# some projects may prefer to download sources or do some extra pre-build steps 
+PREBUILD="prebuild.sh"
+[[ -f ${RPM_SELECTED}/${PREBUILD} ]] &amp;&amp; cp ${RPM_SELECTED}/${PREBUILD} ${PREBUILD}
+[[ -f ${PREBUILD} ]] &amp;&amp; chmod +x ${PREBUILD} &amp;&amp; ./${PREBUILD}
+
+rpmbuild -bb SPECS/*.spec
+</command>
+        </hudson.tasks.Shell>
+        <hudson.tasks.Shell>
+            <command>set +x
+source /etc/deploy/passwords.sh
+
+REPO_URL="https://$NEXUS_USER:$NEXUS_PASSWORD@mvn.malibucoding.com/content/repositories/thirdparty/"
+REPO_ID="dandb-nexus"
+
+for arch in $(echo noarch x86_64)
+do
+  for file in $(ls RPMS/${arch}/)
+  do
+    name=$(rpm -qpa --qf "%{n}" RPMS/${arch}/${file})
+    version=$(rpm -qpa --qf "%{v}-%{r}\n" RPMS/${arch}/${file})
+
+    $HOME/tools/hudson.tasks.Maven_MavenInstallation/Maven_3.0.4/bin/mvn deploy:deploy-file \
+      -Durl=$REPO_URL \
+      -DrepositoryId=$REPO_ID \
+      -DgroupId=${RPM_SELECTED} \
+      -DartifactId=${name} \
+      -Dversion=$version \
+      -Dpackaging=rpm \
+      -Dfile=RPMS/${arch}/${file}
+  done
+done
+</command>
+        </hudson.tasks.Shell>
+    </builders>
+    <publishers>
+        <hudson.tasks.ArtifactArchiver>
+            <artifacts>RPMS/**,SRPMS/**</artifacts>
+            <allowEmptyArchive>false</allowEmptyArchive>
+            <defaultExcludes>true</defaultExcludes>
+            <fingerprint>false</fingerprint>
+            <onlyIfSuccessful>false</onlyIfSuccessful>
+        </hudson.tasks.ArtifactArchiver>
+        <org.jvnet.hudson.plugins.groovypostbuild.GroovyPostbuildRecorder>
+            <groovyScript>
+def result = manager.build.@result
+def errorHelperUrl = "https://dunandb.jira.com/wiki/display/INFRASYS/Troubleshooting+a+Failed+Jenkins+Build"
+def errorHelperHtml = "&lt;h3&gt;Jenkins is sorry, your build failed.  Please see the following URL for helpful suggestions and next steps before involving other teams, i.e. DevOps, &lt;/h3&gt; &lt;a href='"+ errorHelperUrl + "'&gt; JENKINS WIKI &lt;/a&gt;"
+
+
+if(result == hudson.model.Result.FAILURE || result == hudson.model.Result.UNSTABLE) {
+   manager.createSummary("error.gif").appendText(errorHelperHtml, false, false, false, "red")
+}
+            </groovyScript>
+            <behavior>0</behavior>
+        </org.jvnet.hudson.plugins.groovypostbuild.GroovyPostbuildRecorder>
+    </publishers>
+    <buildWrappers/>
+    <assignedNode>default</assignedNode>
+    <logRotator>
+        <daysToKeep>20</daysToKeep>
+        <numToKeep>15</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+    </logRotator>
+    <scm class="hudson.plugins.git.GitSCM">
+        <userRemoteConfigs>
+            <hudson.plugins.git.UserRemoteConfig>
+                <url>git@github.com:dandb/site-config-specs.git</url>
+            </hudson.plugins.git.UserRemoteConfig>
+        </userRemoteConfigs>
+        <branches>
+            <hudson.plugins.git.BranchSpec>
+                <name>master</name>
+            </hudson.plugins.git.BranchSpec>
+        </branches>
+        <configVersion>2</configVersion>
+        <disableSubmodules>false</disableSubmodules>
+        <recursiveSubmodules>false</recursiveSubmodules>
+        <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+        <authorOrCommitter>false</authorOrCommitter>
+        <clean>false</clean>
+        <wipeOutWorkspace>false</wipeOutWorkspace>
+        <pruneBranches>false</pruneBranches>
+        <remotePoll>false</remotePoll>
+        <ignoreNotifyCommit>false</ignoreNotifyCommit>
+        <gitTool>Default</gitTool>
+        <skipTag>true</skipTag>
+        <browser class="hudson.plugins.git.browser.GithubWeb">
+            <url>https://github.com/dandb/site-config-specs/</url>
+        </browser>
+    </scm>
+</project>
